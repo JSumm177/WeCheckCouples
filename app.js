@@ -892,6 +892,7 @@ function saveCheckInToHistory() {
 
   showToast("Check-In saved to history!");
   navigateToView('history');
+  saveCheckInToServer(record);
 }
 
 function discardDraftAndExit() {
@@ -904,6 +905,62 @@ function discardDraftAndExit() {
 // 8. History Timeline & Dynamic SVG Trend Charts
 // ==========================================================================
 
+// --- Unified Database API Helpers ---
+async function fetchHistoryFromServer() {
+  try {
+    const res = await fetch('./api/history');
+    if (!res.ok) throw new Error("HTTP error " + res.status);
+    const serverHistory = await res.json();
+    if (Array.isArray(serverHistory)) {
+      console.log(`Fetched ${serverHistory.length} check-ins from MySQL database.`);
+      const mergedMap = new Map();
+      state.history.forEach(item => mergedMap.set(item.timestamp, item));
+      serverHistory.forEach(item => mergedMap.set(item.timestamp, item));
+      const mergedHistory = Array.from(mergedMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+      state.history = mergedHistory;
+      localStorage.setItem('wecheck_history', JSON.stringify(state.history));
+      if (state.activeView === 'history') {
+        renderHistoryDashboard();
+      } else if (state.activeView === 'welcome') {
+        renderMiniDashboard();
+      }
+    }
+  } catch (err) {
+    console.warn("Could not sync check-ins from database server (offline mode):", err.message);
+  }
+}
+
+async function saveCheckInToServer(record) {
+  try {
+    const res = await fetch('./api/check-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record)
+    });
+    if (!res.ok) throw new Error("HTTP error " + res.status);
+    console.log("Check-in synced to MySQL database successfully.");
+  } catch (err) {
+    console.warn("Could not push check-in to database server (saved locally):", err.message);
+    showToast("Saved locally. Will sync to database when online.", 'info');
+  }
+}
+
+async function syncAllWithServer() {
+  if (state.history.length === 0) return;
+  try {
+    const res = await fetch('./api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checkIns: state.history })
+    });
+    if (!res.ok) throw new Error("HTTP error " + res.status);
+    console.log("All local check-ins successfully synced with database server.");
+    await fetchHistoryFromServer();
+  } catch (err) {
+    console.warn("Auto-sync with database server failed (offline mode):", err.message);
+  }
+}
+
 function loadHistory() {
   const saved = localStorage.getItem('wecheck_history');
   if (saved) {
@@ -914,10 +971,12 @@ function loadHistory() {
       state.history = [...defaultHistory];
     }
   } else {
-    // Setup beautiful pre-populated history on first load
     state.history = [...defaultHistory];
     localStorage.setItem('wecheck_history', JSON.stringify(state.history));
   }
+  
+  // Background sync trigger
+  syncAllWithServer().then(() => fetchHistoryFromServer());
 }
 
 function renderHistoryDashboard() {
@@ -1435,6 +1494,7 @@ function handleDatabaseRestore(e) {
           localStorage.setItem('wecheck_history', JSON.stringify(state.history));
           showToast("Database restored successfully!");
           renderHistoryDashboard();
+          syncAllWithServer(); // Push imports to server DB
           
           // Clear file selector input so same file can be uploaded again
           el.dbFileInput.value = '';
@@ -1454,10 +1514,16 @@ function handleDatabaseRestore(e) {
 
 function clearDatabase() {
   if (confirm("Are you absolutely sure you want to clear your entire check-in history? This cannot be undone.")) {
+    const historyToDelete = [...state.history];
     state.history = [];
     localStorage.removeItem('wecheck_history');
     showToast("History database cleared completely.");
     renderHistoryDashboard();
+    
+    historyToDelete.forEach(item => {
+      fetch(`./api/check-in/${item.timestamp}`, { method: 'DELETE' })
+        .catch(err => console.warn(`Could not delete check-in ${item.timestamp} on server:`, err));
+    });
   }
 }
 

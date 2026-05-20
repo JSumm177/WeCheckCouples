@@ -13,6 +13,22 @@ services:
     volumes:
       - wecheck-db-data:/var/lib/mysql
 
+  app:
+    build: .
+    container_name: wecheck-app
+    restart: always
+    ports:
+      - "8085:8085"
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: wecheck_db
+      DB_USER: wecheck_user
+      DB_PASSWORD: wecheck_password
+      PORT: 8085
+
   adminer:
     image: adminer
     container_name: wecheck-adminer

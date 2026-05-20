@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>WeCheck • A Therapeutic Couples Space</title>
+  <!-- SEO & Meta Tags -->
+  <meta name="description" content="A beautiful, calming, and therapeutic check-in space for couples to stay connected, express appreciation, share needs, and build a beautiful future together.">
+  <meta name="theme-color" content="#f9f6f0">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="icons/logo.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
+  <!-- Google Fonts for Elegant Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Ambient Soft Pastel Background Glows -->
+  <div class="ambient-glow glow-sage" aria-hidden="true"></div>
+  <div class="ambient-glow glow-rose" aria-hidden="true"></div>
+  <div class="ambient-glow glow-lavender" aria-hidden="true"></div>
+
+  <!-- Main App Shell -->
+  <div class="app-container">
+    <header class="app-header">
+      <div class="brand">
+        <svg class="brand-logo" width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M18 31C24.6274 31 30 25.6274 30 19C30 14.8 27.2 11.2 23.3 9.7C22.6 12.8 19.8 15 16.5 15C12.4 15 9 11.6 9 7.5C9 6.2 9.3 5 9.9 4C4.3 5.9 0.2 11.2 0.2 17.5C0.2 24.1274 5.57258 29.5 12.2 29.5C14.2 29.5 16.2 29 18 28.1M18 31C14.7 31 11.7 29.7 9.5 27.6M18 31C20.8 31 23.4 30 25.5 28.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M18 7C18 10.3137 20.6863 13 24 13C27.3137 13 30 10.3137 30 7C30 3.68629 27.3137 1 24 1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M14 21C14.8 19 17.2 17.5 19.5 18.5C21.8 19.5 22.2 22 21.2 23.5C20.2 25 18 26.5 14 26.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <h1 class="brand-title">WeCheck</h1>
+      </div>
+      <div class="header-actions">
+        <button id="theme-toggle-btn" class="icon-btn" aria-label="Toggle dark mode">
+          <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button id="nav-history-btn" class="btn btn-secondary btn-sm" aria-label="View history and dashboard">History & Insights</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- VIEW 1: WELCOME & SELECTION SCREEN -->
+      <section id="view-welcome" class="app-view active-view">
+        <div class="welcome-hero">
+          <p class="subtitle">A peaceful space for your partnership</p>
+          <h2 class="title-primary">Nurture Your Connection</h2>
+          <p class="description">Take a few quiet minutes to step away from the noise, reflect on your week, and align with each other. Choose how you would like to complete your check-in today.</p>
+        </div>
+
+        <div class="glass-card mode-setup-card">
+          <h3 class="section-title">Configure Your Check-In</h3>
+          
+          <div class="form-group">
+            <label for="checkin-mode">Who is filling this out today?</label>
+            <div class="custom-select-wrapper">
+              <select id="checkin-mode" name="checkin_mode" aria-describedby="mode-hint">
+                <option value="together" selected>Together Mode (Alternating turns - recommended)</option>
+                <option value="sidebyside">Together Mode (Side-by-Side view)</option>
+                <option value="carter">Carter's Turn (Carter fills out, Jurrand's fields hidden)</option>
+                <option value="jurrand">Jurrand's Turn (Jurrand fills out, Carter's fields hidden)</option>
+              </select>
+            </div>
+            <p id="mode-hint" class="field-hint">Alternating turns guides you screen by screen together. Side-by-side displays both partners at once.</p>
+          </div>
+
+          <div class="welcome-buttons-row">
+            <button id="start-checkin-btn" class="btn btn-primary btn-lg">Start New Check-In</button>
+            <button id="resume-draft-btn" class="btn btn-secondary btn-lg" style="display: none;">Resume In-Progress Draft</button>
+          </div>
+        </div>
+
+        <div class="quick-insights-summary" id="quick-insights" style="display: none;">
+          <h3 class="small-title">Recent Connection Flow</h3>
+          <div class="mini-chart-container">
+            <svg id="mini-trend-chart" width="100%" height="80" viewBox="0 0 300 80" preserveAspectRatio="none"></svg>
+          </div>
+          <p class="text-xs" id="quick-insights-text">Your connection score averaged 8.2 over the last 3 check-ins.</p>
+        </div>
+      </section>
+
+      <!-- VIEW 2: ACTIVE CHECK-IN WIZARD -->
+      <section id="view-wizard" class="app-view">
+        <div class="wizard-progress-bar-container">
+          <div class="wizard-progress-bar" id="progress-indicator" style="width: 20%;" aria-hidden="true"></div>
+          <div class="wizard-steps-indicators">
+            <span class="step-dot active" data-step="1" title="Connectedness">1. Connection</span>
+            <span class="step-dot" data-step="2" title="Needs">2. Needs</span>
+            <span class="step-dot" data-step="3" title="Appreciation">3. Gratitude</span>
+            <span class="step-dot" data-step="4" title="Goals & Future">4. Goals</span>
+            <span class="step-dot" data-step="5" title="Overview">5. Overview</span>
+          </div>
+        </div>
+
+        <div class="wizard-header">
+          <h2 id="wizard-step-title" class="title-secondary">1. Connectedness</h2>
+          <p id="wizard-step-subtitle" class="wizard-subtitle">Reflecting on how close we felt this week.</p>
+        </div>
+
+        <form id="checkin-form" novalidate>
+          <div class="glass-card wizard-content-card">
+            <!-- WIZARD STEP 1: CONNECTEDNESS -->
+            <fieldset id="step-1" class="wizard-step active-step">
+              <legend class="visually-hidden">Step 1: Connectedness</legend>
+              
+              <!-- Scale 1-10 Slider Question -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">On a scale of 1-10, how connected to me have you felt this week?</h3>
+                
+                <div class="partner-inputs-grid">
+                  <!-- CARTER INPUT -->
+                  <div class="partner-input-col" id="col-c-connectedness">
+                    <div class="partner-label carter-theme">
+                      <span class="avatar-dot"></span> Carter
+                    </div>
+                    <div class="slider-feedback-wrapper">
+                      <span class="slider-value" id="val-c-scale">8</span>
+                      <span class="slider-emoji" id="emoji-c-scale">😊</span>
+                      <span class="slider-text" id="text-c-scale">Warm & Connected</span>
+                    </div>
+                    <div class="slider-container">
+                      <input type="range" id="c-scale" name="c_scale" min="1" max="10" value="8" step="1" aria-label="Carter's connection scale value">
+                      <div class="slider-ticks" aria-hidden="true">
+                        <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- JURRAND INPUT -->
+                  <div class="partner-input-col" id="col-j-connectedness">
+                    <div class="partner-label jurrand-theme">
+                      <span class="avatar-dot"></span> Jurrand
+                    </div>
+                    <div class="slider-feedback-wrapper">
+                      <span class="slider-value" id="val-j-scale">8</span>
+                      <span class="slider-emoji" id="emoji-j-scale">😊</span>
+                      <span class="slider-text" id="text-j-scale">Warm & Connected</span>
+                    </div>
+                    <div class="slider-container">
+                      <input type="range" id="j-scale" name="j_scale" min="1" max="10" value="8" step="1" aria-label="Jurrand's connection scale value">
+                      <div class="slider-ticks" aria-hidden="true">
+                        <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Question: What made you feel most connected -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">What made you feel most connected to me?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-most-connected">
+                    <label for="c-most-connected" class="partner-label carter-theme">Carter's Reflection</label>
+                    <textarea id="c-most-connected" name="c_most_connected" rows="4" placeholder="Share a specific moment, conversation, or gesture that made you feel close..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-most-connected">
+                    <label for="j-most-connected" class="partner-label jurrand-theme">Jurrand's Reflection</label>
+                    <textarea id="j-most-connected" name="j_most_connected" rows="4" placeholder="Share a specific moment, conversation, or gesture that made you feel close..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Question: What made you feel distant -->
+              <div class="question-block">
+                <h3 class="question-text">What made you feel distant from me?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-distant">
+                    <label for="c-distant" class="partner-label carter-theme">Carter's Reflection</label>
+                    <textarea id="c-distant" name="c_distant" rows="4" placeholder="Share gently what felt like a barrier or distance this week..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-distant">
+                    <label for="j-distant" class="partner-label jurrand-theme">Jurrand's Reflection</label>
+                    <textarea id="j-distant" name="j_distant" rows="4" placeholder="Share gently what felt like a barrier or distance this week..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- WIZARD STEP 2: NEEDS -->
+            <fieldset id="step-2" class="wizard-step">
+              <legend class="visually-hidden">Step 2: Needs</legend>
+              
+              <!-- Question: What's one thing you need more of -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">What's one thing you need more of from me this week?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-more-of">
+                    <label for="c-more-of" class="partner-label carter-theme">Carter's Need</label>
+                    <textarea id="c-more-of" name="c_more_of" rows="4" placeholder="E.g. quality time, words of affirmation, physical touch, help with a task..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-more-of">
+                    <label for="j-more-of" class="partner-label jurrand-theme">Jurrand's Need</label>
+                    <textarea id="j-more-of" name="j_more_of" rows="4" placeholder="E.g. quality time, words of affirmation, physical touch, help with a task..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Question: What's one thing you need less of -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">What’s one thing you need less of?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-less-of">
+                    <label for="c-less-of" class="partner-label carter-theme">Carter's Need</label>
+                    <textarea id="c-less-of" name="c_less_of" rows="4" placeholder="E.g. screen time together, rushing, talking about logistics, stress spillover..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-less-of">
+                    <label for="j-less-of" class="partner-label jurrand-theme">Jurrand's Need</label>
+                    <textarea id="j-less-of" name="j_less_of" rows="4" placeholder="E.g. screen time together, rushing, talking about logistics, stress spillover..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Question: Is there anything bothering you -->
+              <div class="question-block">
+                <h3 class="question-text">Is there anything from this week that's bothering you that you haven't mentioned?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-bothering">
+                    <label for="c-bothering" class="partner-label carter-theme">Carter's Reflection</label>
+                    <textarea id="c-bothering" name="c_bothering" rows="4" placeholder="Share anything small or large that has been lingering in your mind..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-bothering">
+                    <label for="j-bothering" class="partner-label jurrand-theme">Jurrand's Reflection</label>
+                    <textarea id="j-bothering" name="j_bothering" rows="4" placeholder="Share anything small or large that has been lingering in your mind..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- WIZARD STEP 3: APPRECIATION -->
+            <fieldset id="step-3" class="wizard-step">
+              <legend class="visually-hidden">Step 3: Appreciation</legend>
+              <div class="sparkle-container" id="heart-burst-emitter" aria-hidden="true"></div>
+
+              <!-- Question: What's something I did that made you feel loved -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">What's something I did this week/month that made you feel loved?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-feel-loved">
+                    <label for="c-feel-loved" class="partner-label carter-theme">Carter's Heart</label>
+                    <textarea id="c-feel-loved" name="c_feel_loved" rows="4" class="appreciation-textarea" placeholder="Share a specific moment or act of service, touch, or word that made you melt..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-feel-loved">
+                    <label for="j-feel-loved" class="partner-label jurrand-theme">Jurrand's Heart</label>
+                    <textarea id="j-feel-loved" name="j_feel_loved" rows="4" class="appreciation-textarea" placeholder="Share a specific moment or act of service, touch, or word that made you melt..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Question: What's a quality of mine you're grateful for -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">What's a quality of mine you're grateful for right now?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-grateful-quality">
+                    <label for="c-grateful-quality" class="partner-label carter-theme">Carter's Heart</label>
+                    <textarea id="c-grateful-quality" name="c_grateful_quality" rows="4" class="appreciation-textarea" placeholder="Focus on a trait of mine: kindness, patience, humor, passion, wisdom..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-grateful-quality">
+                    <label for="j-grateful-quality" class="partner-label jurrand-theme">Jurrand's Heart</label>
+                    <textarea id="j-grateful-quality" name="j_grateful_quality" rows="4" class="appreciation-textarea" placeholder="Focus on a trait of mine: kindness, patience, humor, passion, wisdom..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Question: What's something you appreciate about our relationship -->
+              <div class="question-block">
+                <h3 class="question-text">What's something you appreciate about our relationship lately?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-appreciate-relationship">
+                    <label for="c-appreciate-relationship" class="partner-label carter-theme">Carter's Heart</label>
+                    <textarea id="c-appreciate-relationship" name="c_appreciate_relationship" rows="4" class="appreciation-textarea" placeholder="Reflect on our chemistry, friendship, partnership, growth, or dynamic..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-appreciate-relationship">
+                    <label for="j-appreciate-relationship" class="partner-label jurrand-theme">Jurrand's Heart</label>
+                    <textarea id="j-appreciate-relationship" name="j_appreciate_relationship" rows="4" class="appreciation-textarea" placeholder="Reflect on our chemistry, friendship, partnership, growth, or dynamic..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- WIZARD STEP 4: GOALS / FUTURE -->
+            <fieldset id="step-4" class="wizard-step">
+              <legend class="visually-hidden">Step 4: Goals/Future</legend>
+
+              <!-- Question: Are we still on the same page about goals -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">Are we still on the same page about goals?</h3>
+                <div class="partner-inputs-grid">
+                  
+                  <!-- Carter Goal Check -->
+                  <div class="partner-input-col" id="col-c-goals-page">
+                    <div class="partner-label carter-theme">Carter's Alignment</div>
+                    <div class="toggle-switch-wrapper">
+                      <input type="checkbox" id="c-goals-page" name="c_goals_page" class="visually-hidden" checked>
+                      <label for="c-goals-page" class="toggle-switch-label">
+                        <span class="toggle-state-text text-yes">Yes, fully aligned</span>
+                        <span class="toggle-state-text text-no">No, we should discuss</span>
+                        <span class="toggle-switch-handle"></span>
+                      </label>
+                    </div>
+                    <textarea id="c-goals-notes" name="c_goals_notes" rows="3" class="mt-xs" placeholder="Add any details, reflections, or goals you want to clarify..." maxlength="1000"></textarea>
+                  </div>
+
+                  <!-- Jurrand Goal Check -->
+                  <div class="partner-input-col" id="col-j-goals-page">
+                    <div class="partner-label jurrand-theme">Jurrand's Alignment</div>
+                    <div class="toggle-switch-wrapper">
+                      <input type="checkbox" id="j-goals-page" name="j_goals_page" class="visually-hidden" checked>
+                      <label for="j-goals-page" class="toggle-switch-label">
+                        <span class="toggle-state-text text-yes">Yes, fully aligned</span>
+                        <span class="toggle-state-text text-no">No, we should discuss</span>
+                        <span class="toggle-switch-handle"></span>
+                      </label>
+                    </div>
+                    <textarea id="j-goals-notes" name="j_goals_notes" rows="3" class="mt-xs" placeholder="Add any details, reflections, or goals you want to clarify..." maxlength="1000"></textarea>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Question: Is there anything about our future that is worrying you -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">Is there anything about our future that is worrying you?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-future-worries">
+                    <label for="c-future-worries" class="partner-label carter-theme">Carter's Reflection</label>
+                    <textarea id="c-future-worries" name="c_future_worries" rows="4" placeholder="Name any worries gently (e.g. finances, health, career changes, moving, aging)..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-future-worries">
+                    <label for="j-future-worries" class="partner-label jurrand-theme">Jurrand's Reflection</label>
+                    <textarea id="j-future-worries" name="j_future_worries" rows="4" placeholder="Name any worries gently (e.g. finances, health, career changes, moving, aging)..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Question: What's something you're excited about regarding us -->
+              <div class="question-block">
+                <h3 class="question-text">What's something you're excited about regarding us?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-excited">
+                    <label for="c-excited" class="partner-label carter-theme">Carter's Excitement</label>
+                    <textarea id="c-excited" name="c_excited" rows="4" placeholder="Upcoming trips, shared milestones, simple weekend plans, growth..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-excited">
+                    <label for="j-excited" class="partner-label jurrand-theme">Jurrand's Excitement</label>
+                    <textarea id="j-excited" name="j_excited" rows="4" placeholder="Upcoming trips, shared milestones, simple weekend plans, growth..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- WIZARD STEP 5: OVERVIEW -->
+            <fieldset id="step-5" class="wizard-step">
+              <legend class="visually-hidden">Step 5: Overview</legend>
+
+              <!-- Question: How are we doing as a couple? -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">How are we doing as a couple?</h3>
+                <div class="partner-inputs-grid">
+                  
+                  <!-- Carter Overview Select -->
+                  <div class="partner-input-col" id="col-c-couple-overview">
+                    <label class="partner-label carter-theme">Carter's Assessment</label>
+                    <div class="status-btn-group" id="c-status-group">
+                      <button type="button" class="status-btn" data-status="Needs Care" data-value="1">Needs Care</button>
+                      <button type="button" class="status-btn" data-status="Gentle Waters" data-value="2">Gentle Waters</button>
+                      <button type="button" class="status-btn active" data-status="Flowing Steady" data-value="3">Flowing Steady</button>
+                      <button type="button" class="status-btn" data-status="Deeply Aligned" data-value="4">Deeply Aligned</button>
+                    </div>
+                    <input type="hidden" id="c-couple-status" name="c_couple_status" value="Flowing Steady">
+                    <textarea id="c-couple-overview-notes" name="c_couple_overview_notes" rows="3" class="mt-xs" placeholder="Elaborate on how we are doing overall as a unit..." maxlength="1000"></textarea>
+                  </div>
+
+                  <!-- Jurrand Overview Select -->
+                  <div class="partner-input-col" id="col-j-couple-overview">
+                    <label class="partner-label jurrand-theme">Jurrand's Assessment</label>
+                    <div class="status-btn-group" id="j-status-group">
+                      <button type="button" class="status-btn" data-status="Needs Care" data-value="1">Needs Care</button>
+                      <button type="button" class="status-btn" data-status="Gentle Waters" data-value="2">Gentle Waters</button>
+                      <button type="button" class="status-btn active" data-status="Flowing Steady" data-value="3">Flowing Steady</button>
+                      <button type="button" class="status-btn" data-status="Deeply Aligned" data-value="4">Deeply Aligned</button>
+                    </div>
+                    <input type="hidden" id="j-couple-status" name="j_couple_status" value="Flowing Steady">
+                    <textarea id="j-couple-overview-notes" name="j_couple_overview_notes" rows="3" class="mt-xs" placeholder="Elaborate on how we are doing overall as a unit..." maxlength="1000"></textarea>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Question: What's one thing we could improve -->
+              <div class="question-block border-bottom">
+                <h3 class="question-text">What's one thing we could improve?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-improve">
+                    <label for="c-improve" class="partner-label carter-theme">Carter's Growth Area</label>
+                    <textarea id="c-improve" name="c_improve" rows="4" placeholder="Name an actionable, friendly way we can step up for each other..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-improve">
+                    <label for="j-improve" class="partner-label jurrand-theme">Jurrand's Growth Area</label>
+                    <textarea id="j-improve" name="j_improve" rows="4" placeholder="Name an actionable, friendly way we can step up for each other..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Question: What's working really well for us right now -->
+              <div class="question-block">
+                <h3 class="question-text">What's working really well for us right now?</h3>
+                <div class="partner-inputs-grid">
+                  <div class="partner-input-col" id="col-c-working-well">
+                    <label for="c-working-well" class="partner-label carter-theme">Carter's Celebration</label>
+                    <textarea id="c-working-well" name="c_working_well" rows="4" placeholder="E.g. our morning coffee talks, our team-ups on dinners, our shared laughs..." maxlength="1000"></textarea>
+                  </div>
+                  <div class="partner-input-col" id="col-j-working-well">
+                    <label for="j-working-well" class="partner-label jurrand-theme">Jurrand's Celebration</label>
+                    <textarea id="j-working-well" name="j_working_well" rows="4" placeholder="E.g. our morning coffee talks, our team-ups on dinners, our shared laughs..." maxlength="1000"></textarea>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+          </div>
+
+          <!-- Wizard Footer Controls -->
+          <div class="wizard-footer-controls">
+            <button type="button" id="wizard-back-btn" class="btn btn-secondary btn-lg" style="visibility: hidden;">Back</button>
+            <div class="wizard-buttons-right">
+              <button type="button" id="wizard-cancel-btn" class="btn btn-tertiary">Cancel</button>
+              <button type="button" id="wizard-next-btn" class="btn btn-primary btn-lg">Next</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- VIEW 3: CELEBRATION & EXPORT SCREEN -->
+      <section id="view-celebration" class="app-view">
+        <div class="celebration-wrapper text-center">
+          <div class="hearts-illustration-container" aria-hidden="true">
+            <svg class="heart-pulse-svg" width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path class="svg-heart-bg" d="M60 102C60 102 15 76.5 15 45C15 28.4315 28.4315 15 45 15C53.7547 15 60 21 60 21C60 21 66.2453 15 75 15C91.5685 15 105 28.4315 105 45C105 76.5 60 102 60 102Z" fill="#e3a89c" opacity="0.15"/>
+              <path class="svg-heart-fg" d="M60 92C60 92 25 71.5 25 45C25 31.7452 35.7452 21 49 21C56.0037 21 60 25.8 60 25.8C60 25.8 63.9963 21 71 21C84.2548 21 95 31.7452 95 45C95 71.5 60 92 60 92Z" fill="#d48d7f"/>
+              <circle class="heart-circle" cx="60" cy="45" r="3" fill="#fff"/>
+              <path d="M48 60C50 63 56 63 60 60C64 63 70 63 72 60" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          
+          <h2 class="title-primary font-serif">Check-In Completed!</h2>
+          <p class="subtitle-celebration">Thank you for sharing your thoughts, gratitude, and care today.</p>
+
+          <div class="glass-card export-block text-left mt-lg">
+            <div class="export-header">
+              <h3 class="small-title">Your Formatted Summary</h3>
+              <div class="export-actions">
+                <button id="copy-summary-btn" class="btn btn-secondary btn-sm">Copy Template</button>
+                <button id="download-summary-btn" class="btn btn-secondary btn-sm">Download (.md)</button>
+              </div>
+            </div>
+            <div class="summary-preview-container">
+              <pre id="summary-preview-code">Loading summary...</pre>
+            </div>
+          </div>
+
+          <div class="celebration-actions mt-lg">
+            <button id="save-history-btn" class="btn btn-primary btn-lg">Save to History</button>
+            <button id="discard-draft-btn" class="btn btn-tertiary">Back to Dashboard</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: HISTORY & INSIGHTS DASHBOARD -->
+      <section id="view-history" class="app-view">
+        <div class="dashboard-header-row">
+          <div class="header-left">
+            <button id="back-from-history-btn" class="btn-back-link">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Back to Home
+            </button>
+            <h2 class="title-secondary font-serif">Your Connection Insights</h2>
+          </div>
+          <div class="database-controls">
+            <button id="backup-db-btn" class="btn btn-secondary btn-xs" title="Download backup of all history">Backup</button>
+            <button id="restore-db-btn" class="btn btn-secondary btn-xs" title="Restore history from file">Restore</button>
+            <input type="file" id="db-file-input" style="display:none;" accept=".json">
+            <button id="clear-db-btn" class="btn btn-danger btn-xs" title="Reset history">Clear All</button>
+          </div>
+        </div>
+
+        <div class="insights-grid">
+          <!-- Trends Chart Panel -->
+          <div class="glass-card chart-card">
+            <div class="chart-header-row">
+              <h3 class="panel-title">Connectedness Over Time</h3>
+              <div class="chart-filters" role="group" aria-label="Chart time range filter">
+                <button class="filter-btn active" data-range="all">All Time</button>
+                <button class="filter-btn" data-range="3months">Last 3 Months</button>
+                <button class="filter-btn" data-range="4weeks">Last 4 Weeks</button>
+              </div>
+            </div>
+            
+            <div class="chart-visualization-wrapper">
+              <svg id="trend-svg" width="100%" height="220" viewBox="0 0 600 220" preserveAspectRatio="none">
+                <!-- SVG elements generated dynamically in app.js -->
+              </svg>
+            </div>
+            
+            <div class="chart-legend" aria-hidden="true">
+              <span class="legend-item carter"><span class="legend-dot"></span> Carter's Connection</span>
+              <span class="legend-item jurrand"><span class="legend-dot"></span> Jurrand's Connection</span>
+            </div>
+          </div>
+
+          <!-- History List Panel -->
+          <div class="glass-card history-list-card">
+            <h3 class="panel-title">Past Check-Ins</h3>
+            <div class="empty-history-state" id="empty-history" style="display: none;">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke-linecap="round"/></svg>
+              <p>Your check-in history is currently empty. Completing your first check-in will build your timeline!</p>
+            </div>
+            <ul class="history-list-element" id="history-items-container">
+              <!-- Dynamically populated in app.js -->
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p class="text-xs">WeCheck • Made with care for Carter & Jurrand. All data is stored locally and securely on your own device.</p>
+    </footer>
+  </div>
+
+  <!-- PAST CHECK-IN DETAILS MODAL (ACCESSIBLE POP-OVER/DIALOG) -->
+  <div id="past-checkin-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="glass-card modal-container">
+      <header class="modal-header">
+        <h2 id="modal-title" class="title-secondary font-serif">Check-In Details</h2>
+        <button id="close-modal-btn" class="icon-btn close-btn" aria-label="Close details dialog">&times;</button>
+      </header>
+      <div class="modal-body" id="modal-details-content">
+        <!-- Filled dynamically in app.js -->
+      </div>
+      <footer class="modal-footer">
+        <button id="modal-copy-btn" class="btn btn-secondary">Copy Answers</button>
+        <button id="modal-close-action-btn" class="btn btn-primary">Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="toast-container-class" aria-live="polite"></div>
+
+  <!-- Core Client JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "WeCheck Couples Space",
+  "short_name": "WeCheck",
+  "description": "A beautiful, calming, and therapeutic check-in space for couples.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#faf9f6",
+  "theme_color": "#f4f0e6",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

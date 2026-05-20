@@ -962,6 +962,7 @@ async function syncAllWithServer() {
 }
 
 function loadHistory() {
+  const todayStart = 1779256800000; // May 20, 2026 00:00:00-06:00
   const saved = localStorage.getItem('wecheck_history');
   if (saved) {
     try {
@@ -972,6 +973,13 @@ function loadHistory() {
     }
   } else {
     state.history = [...defaultHistory];
+  }
+  
+  // Filter out any check-ins before today (May 20, 2026)
+  const originalLength = state.history.length;
+  state.history = state.history.filter(item => item.timestamp >= todayStart);
+  if (state.history.length !== originalLength) {
+    console.log(`Cleared ${originalLength - state.history.length} pre-today check-ins from local state.`);
     localStorage.setItem('wecheck_history', JSON.stringify(state.history));
   }
   

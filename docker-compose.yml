@@ -1,0 +1,26 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: wecheck-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: wecheck_root_password
+      MYSQL_DATABASE: wecheck_db
+      MYSQL_USER: wecheck_user
+      MYSQL_PASSWORD: wecheck_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - wecheck-db-data:/var/lib/mysql
+
+  adminer:
+    image: adminer
+    container_name: wecheck-adminer
+    restart: always
+    ports:
+      - "8087:8080"
+    depends_on:
+      - db
+
+volumes:
+  wecheck-db-data:

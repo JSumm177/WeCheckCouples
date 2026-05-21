@@ -535,12 +535,35 @@
   <!-- PAST CHECK-IN DETAILS MODAL (ACCESSIBLE POP-OVER/DIALOG) -->
   <div id="past-checkin-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="glass-card modal-container">
-      <header class="modal-header">
-        <h2 id="modal-title" class="title-secondary font-serif">Check-In Details</h2>
-        <button id="close-modal-btn" class="icon-btn close-btn" aria-label="Close details dialog">&times;</button>
+      <header class="modal-header modal-header-tabbed">
+        <div class="modal-header-top">
+          <h2 id="modal-title" class="title-secondary font-serif">Check-In Details</h2>
+          <button id="close-modal-btn" class="icon-btn close-btn" aria-label="Close details dialog">&times;</button>
+        </div>
+        <div class="modal-tabs">
+          <button id="modal-tab-structured" class="modal-tab active">Comparison View</button>
+          <button id="modal-tab-markdown" class="modal-tab">Markdown Summary</button>
+        </div>
       </header>
-      <div class="modal-body" id="modal-details-content">
-        <!-- Filled dynamically in app.js -->
+      <div class="modal-body modal-body-tabbed">
+        <div id="modal-panel-structured" class="modal-panel active">
+          <div id="modal-details-content">
+            <!-- Filled dynamically in app.js -->
+          </div>
+        </div>
+        <div id="modal-panel-markdown" class="modal-panel">
+          <div class="markdown-preview-header">
+            <button id="modal-md-copy-btn" class="btn btn-secondary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle; display: inline-block;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Copy Markdown
+            </button>
+            <button id="modal-md-download-btn" class="btn btn-secondary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle; display: inline-block;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Download .md
+            </button>
+          </div>
+          <div class="markdown-preview-container">
+            <pre id="modal-markdown-text"></pre>
+          </div>
+        </div>
       </div>
       <footer class="modal-footer">
         <button id="modal-copy-btn" class="btn btn-secondary">Copy Answers</button>

@@ -260,6 +260,13 @@ const el = {
   modalCloseBtn: document.getElementById('close-modal-btn'),
   modalCloseActionBtn: document.getElementById('modal-close-action-btn'),
   modalCopyBtn: document.getElementById('modal-copy-btn'),
+  modalTabStructured: document.getElementById('modal-tab-structured'),
+  modalTabMarkdown: document.getElementById('modal-tab-markdown'),
+  modalPanelStructured: document.getElementById('modal-panel-structured'),
+  modalPanelMarkdown: document.getElementById('modal-panel-markdown'),
+  modalMarkdownText: document.getElementById('modal-markdown-text'),
+  modalMdCopyBtn: document.getElementById('modal-md-copy-btn'),
+  modalMdDownloadBtn: document.getElementById('modal-md-download-btn'),
 
   // Floating Sparkle emitter
   heartBurstEmitter: document.getElementById('heart-burst-emitter'),
@@ -745,7 +752,7 @@ function triggerCelebrationHearts() {
  * Builds the exact custom text checklist requested by the user,
  * dynamic to the selected entry mode configuration.
  */
-function generateMarkdownSummary(answers, timestamp) {
+function generateMarkdownSummary(answers, timestamp, checkinMode) {
   const dateStr = new Date(timestamp).toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
@@ -762,7 +769,7 @@ function generateMarkdownSummary(answers, timestamp) {
     return isChecked ? 'Yes, fully aligned' : 'No, we need to talk';
   };
 
-  const mode = state.mode;
+  const mode = checkinMode || state.mode;
 
   let out = `## Relationship Check-In: ${dateStr}\n\n`;
 
@@ -870,7 +877,8 @@ function handleDownloadSummary() {
 }
 
 // Save active draft to history array and persist in localStorage
-function saveCheckInToHistory() {
+// Save active draft directly to the DB server (with offline fallback cache)
+async function saveCheckInToHistory() {
   if (!state.draft || !state.draft.answers) return;
 
   const timestamp = Date.now();
@@ -886,13 +894,34 @@ function saveCheckInToHistory() {
     answers: state.draft.answers
   };
 
-  state.history.unshift(record); // Add to front of list
-  localStorage.setItem('wecheck_history', JSON.stringify(state.history));
-  localStorage.removeItem('wecheck_draft'); // clear draft
-
-  showToast("Check-In saved to history!");
-  navigateToView('history');
-  saveCheckInToServer(record);
+  // Try saving to the DB server first (absolute single source of truth)
+  try {
+    const res = await fetch('./api/check-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record)
+    });
+    
+    if (!res.ok) throw new Error("HTTP error " + res.status);
+    
+    console.log("Check-in saved to DB server successfully.");
+    showToast("Check-In saved to history!");
+    localStorage.removeItem('wecheck_draft'); // clear draft
+    
+    // Refresh history from the server and navigate
+    await fetchHistoryFromServer();
+    navigateToView('history');
+  } catch (err) {
+    console.error("Failed to save check-in to database server, using offline fallback:", err.message);
+    
+    // Offline mode: Save locally to cache and sync queue
+    state.history.unshift(record);
+    localStorage.setItem('wecheck_history', JSON.stringify(state.history));
+    localStorage.removeItem('wecheck_draft'); // clear draft
+    
+    showToast("Saved locally (Offline). Will sync when online.", 'info');
+    navigateToView('history');
+  }
 }
 
 function discardDraftAndExit() {
@@ -913,12 +942,15 @@ async function fetchHistoryFromServer() {
     const serverHistory = await res.json();
     if (Array.isArray(serverHistory)) {
       console.log(`Fetched ${serverHistory.length} check-ins from MySQL database.`);
-      const mergedMap = new Map();
-      state.history.forEach(item => mergedMap.set(item.timestamp, item));
-      serverHistory.forEach(item => mergedMap.set(item.timestamp, item));
-      const mergedHistory = Array.from(mergedMap.values()).sort((a, b) => b.timestamp - a.timestamp);
-      state.history = mergedHistory;
+      
+      const todayStart = 1779256800000; // May 20, 2026 00:00:00-06:00
+      
+      // DB-First: Single source of truth. Discard pre-today mock data and do not perform local merges!
+      state.history = serverHistory.filter(item => item.timestamp >= todayStart);
+      
+      // Store in local storage strictly as a read-only cache backup
       localStorage.setItem('wecheck_history', JSON.stringify(state.history));
+      
       if (state.activeView === 'history') {
         renderHistoryDashboard();
       } else if (state.activeView === 'welcome') {
@@ -926,7 +958,7 @@ async function fetchHistoryFromServer() {
       }
     }
   } catch (err) {
-    console.warn("Could not sync check-ins from database server (offline mode):", err.message);
+    console.warn("Could not sync check-ins from database server (offline cache fallback):", err.message);
   }
 }
 
@@ -940,8 +972,7 @@ async function saveCheckInToServer(record) {
     if (!res.ok) throw new Error("HTTP error " + res.status);
     console.log("Check-in synced to MySQL database successfully.");
   } catch (err) {
-    console.warn("Could not push check-in to database server (saved locally):", err.message);
-    showToast("Saved locally. Will sync to database when online.", 'info');
+    console.warn("Could not push check-in to database server:", err.message);
   }
 }
 
@@ -968,22 +999,24 @@ function loadHistory() {
     try {
       state.history = JSON.parse(saved);
     } catch(e) {
-      console.error("Failed parsing history, using default mock records", e);
-      state.history = [...defaultHistory];
+      console.error("Failed parsing history from localStorage, starting empty", e);
+      state.history = [];
     }
   } else {
-    state.history = [...defaultHistory];
+    state.history = [];
   }
   
-  // Filter out any check-ins before today (May 20, 2026)
-  const originalLength = state.history.length;
+  // Filter out any check-ins before today
   state.history = state.history.filter(item => item.timestamp >= todayStart);
-  if (state.history.length !== originalLength) {
-    console.log(`Cleared ${originalLength - state.history.length} pre-today check-ins from local state.`);
-    localStorage.setItem('wecheck_history', JSON.stringify(state.history));
+  
+  // Render using cached backup initially (so it loads instantly)
+  if (state.activeView === 'history') {
+    renderHistoryDashboard();
+  } else if (state.activeView === 'welcome') {
+    renderMiniDashboard();
   }
   
-  // Background sync trigger
+  // Immediately request fresh truth from the DB server and sync any offline additions
   syncAllWithServer().then(() => fetchHistoryFromServer());
 }
 
@@ -1441,12 +1474,40 @@ function openCheckInDetailsModal(item) {
 
   el.modalBody.innerHTML = bodyHtml;
   
-  // Modal Copy listener
+  // Reset tab to structured Comparison View on open
+  switchModalTab('structured');
+
+  // Generate and set the Markdown Summary preview content
+  const mdContent = generateMarkdownSummary(answers, item.timestamp, item.mode);
+  el.modalMarkdownText.textContent = mdContent;
+
+  // Footer Copy listener
   el.modalCopyBtn.onclick = () => {
-    const formatted = generateMarkdownSummary(answers, item.timestamp);
-    navigator.clipboard.writeText(formatted).then(() => {
-      showToast("Check-In copied to clipboard!");
+    navigator.clipboard.writeText(mdContent).then(() => {
+      showToast("Check-In Markdown copied!");
     });
+  };
+
+  // Tab Copy listener
+  el.modalMdCopyBtn.onclick = () => {
+    navigator.clipboard.writeText(mdContent).then(() => {
+      showToast("Check-In Markdown copied!");
+    });
+  };
+
+  // Tab Download listener
+  el.modalMdDownloadBtn.onclick = () => {
+    const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateSlug = new Date(item.timestamp).toISOString().slice(0, 10);
+    a.download = `wecheck_${dateSlug}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Check-In Markdown downloaded!");
   };
 
   el.modal.classList.add('active-modal');
@@ -1456,6 +1517,20 @@ function openCheckInDetailsModal(item) {
 function closeDetailsModal() {
   el.modal.classList.remove('active-modal');
   document.body.style.overflow = '';
+}
+
+function switchModalTab(tabName) {
+  if (tabName === 'structured') {
+    el.modalTabStructured.classList.add('active');
+    el.modalTabMarkdown.classList.remove('active');
+    el.modalPanelStructured.classList.add('active');
+    el.modalPanelMarkdown.classList.remove('active');
+  } else {
+    el.modalTabStructured.classList.remove('active');
+    el.modalTabMarkdown.classList.add('active');
+    el.modalPanelStructured.classList.remove('active');
+    el.modalPanelMarkdown.classList.add('active');
+  }
 }
 
 // ==========================================================================
@@ -1520,18 +1595,29 @@ function handleDatabaseRestore(e) {
   reader.readAsText(file);
 }
 
-function clearDatabase() {
+async function clearDatabase() {
   if (confirm("Are you absolutely sure you want to clear your entire check-in history? This cannot be undone.")) {
-    const historyToDelete = [...state.history];
-    state.history = [];
-    localStorage.removeItem('wecheck_history');
-    showToast("History database cleared completely.");
-    renderHistoryDashboard();
+    showToast("Clearing check-in history...", 'info');
     
-    historyToDelete.forEach(item => {
-      fetch(`./api/check-in/${item.timestamp}`, { method: 'DELETE' })
-        .catch(err => console.warn(`Could not delete check-in ${item.timestamp} on server:`, err));
-    });
+    try {
+      // Run deletions in parallel and wait for all to complete
+      await Promise.all(state.history.map(item => 
+        fetch(`./api/check-in/${item.timestamp}`, { method: 'DELETE' })
+          .catch(err => console.warn(`Could not delete check-in ${item.timestamp} on server:`, err))
+      ));
+      
+      state.history = [];
+      localStorage.removeItem('wecheck_history');
+      showToast("History database cleared completely.");
+      renderHistoryDashboard();
+    } catch (err) {
+      console.error("Failed to clear database on server:", err);
+      // Fallback local clear
+      state.history = [];
+      localStorage.removeItem('wecheck_history');
+      showToast("History database cleared locally (Offline).", 'warning');
+      renderHistoryDashboard();
+    }
   }
 }
 
@@ -1608,6 +1694,10 @@ function registerEvents() {
   // Modal dialog close events
   el.modalCloseBtn.addEventListener('click', closeDetailsModal);
   el.modalCloseActionBtn.addEventListener('click', closeDetailsModal);
+  
+  // Modal Tab switching events
+  el.modalTabStructured.addEventListener('click', () => switchModalTab('structured'));
+  el.modalTabMarkdown.addEventListener('click', () => switchModalTab('markdown'));
   
   // Close modal when clicking outside
   window.addEventListener('click', (e) => {

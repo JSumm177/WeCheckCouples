@@ -1494,3 +1494,116 @@ input[type="checkbox"]:not(:checked) + .toggle-switch-label .text-no {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ==========================================================================
+   Modal Tabbed Header & Markdown Preview Styling
+   ========================================================================== */
+
+.modal-header-tabbed {
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 1rem;
+  padding-bottom: 0 !important;
+}
+
+.modal-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.modal-tabs {
+  display: flex;
+  margin-left: -2rem;
+  margin-right: -2rem;
+  margin-bottom: -1px;
+  border-bottom: 1px solid rgba(122, 154, 130, 0.15);
+  padding: 0 2rem;
+}
+
+.modal-tab {
+  background: none;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.85rem 1.25rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition-smooth);
+}
+
+.modal-tab:hover {
+  color: var(--text-main);
+}
+
+.modal-tab.active {
+  color: var(--accent-sage-dark);
+}
+
+[data-theme="dark"] .modal-tab.active {
+  color: var(--accent-sage-dark);
+}
+
+.modal-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 1.25rem;
+  right: 1.25rem;
+  height: 3px;
+  background-color: var(--accent-sage);
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+
+.modal-body-tabbed {
+  padding-top: 1.5rem !important;
+}
+
+.modal-panel {
+  display: none;
+}
+
+.modal-panel.active {
+  display: block;
+  animation: modalPanelFadeIn 0.3s ease;
+}
+
+.markdown-preview-header {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-preview-container {
+  background-color: rgba(122, 154, 130, 0.04);
+  border: 1px solid rgba(122, 154, 130, 0.15);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  overflow-x: auto;
+  max-height: 450px;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.02);
+}
+
+[data-theme="dark"] .markdown-preview-container {
+  background-color: rgba(16, 21, 18, 0.6);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.markdown-preview-container pre {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@keyframes modalPanelFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

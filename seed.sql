@@ -200,3 +200,16 @@ INSERT INTO check_ins (
     'Making joint decisions together feels completely natural.',
     'Doing check-ins like this!'
 );
+
+-- Seed standalone self-appreciations
+-- Carter reflections (shared and private)
+INSERT INTO self_appreciations (author, reflection_date, reflection_timestamp, content, is_shared) VALUES
+('carter', 'May 18, 2026', 1779084000000, 'I took 20 minutes to read quietly in the morning without feeling guilty or like I had to check my email immediately.', TRUE),
+('carter', 'May 20, 2026', 1779256800000, 'I stood up for my creative time today and spent an hour painting, even though there were lots of chores waiting to be done.', FALSE),
+('carter', 'May 24, 2026', 1779602400000, 'I set a very clear boundary with my client about work hours, ensuring I could fully unplug for the weekend.', TRUE);
+
+-- Jurrand reflections (shared and private)
+INSERT INTO self_appreciations (author, reflection_date, reflection_timestamp, content, is_shared) VALUES
+('jurrand', 'May 19, 2026', 1779170400000, 'I allowed myself to take a long, relaxing nap without feeling like I was being lazy or unproductive.', TRUE),
+('jurrand', 'May 21, 2026', 1779343200000, 'I stayed extremely patient with myself when my creative coding project didn’t build on the first attempt.', TRUE),
+('jurrand', 'May 25, 2026', 1779688800000, 'I cooked a nourishing meal just for myself that I’ve been craving, taking the time to fully savor and enjoy it.', FALSE);

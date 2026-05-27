@@ -63,3 +63,38 @@ CREATE TABLE check_ins (
 
 -- Add index on check_in_timestamp for optimal timeline querying and charting
 CREATE INDEX idx_timestamp ON check_ins (check_in_timestamp);
+
+-- Table to store standalone self-appreciation journal reflections
+CREATE TABLE IF NOT EXISTS self_appreciations (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    author VARCHAR(20) NOT NULL COMMENT 'carter, jurrand',
+    reflection_date VARCHAR(50) NOT NULL,
+    reflection_timestamp BIGINT NOT NULL,
+    content TEXT NOT NULL,
+    is_shared BOOLEAN DEFAULT TRUE COMMENT 'Whether shared with the partner',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add index on author and reflection_timestamp for query speed
+CREATE INDEX idx_author_timestamp ON self_appreciations (author, reflection_timestamp);
+
+-- Table to store user accounts
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT 'Abstracted username',
+    password_hash VARCHAR(255) NOT NULL,
+    salt VARCHAR(64) NOT NULL,
+    role VARCHAR(20) NOT NULL COMMENT 'partner_1, partner_2',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table to store active session tokens
+CREATE TABLE IF NOT EXISTS sessions (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

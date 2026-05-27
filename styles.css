@@ -1607,3 +1607,170 @@ input[type="checkbox"]:not(:checked) + .toggle-switch-label .text-no {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ==========================================================================
+   Self-Appreciation Space Styling
+   ========================================================================== */
+
+.self-appreciation-setup-card {
+  border-top: 4px solid var(--accent-sage);
+}
+
+.self-appreciation-setup-card:hover {
+  transform: translateY(-2px);
+}
+
+.appreciation-tabs .modal-tab {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition-smooth);
+}
+
+.appreciation-tabs .modal-tab.active {
+  font-weight: 600;
+  color: var(--text-main);
+  border-bottom: 2px solid var(--accent-sage);
+}
+
+.appreciation-item-card {
+  padding: 1.25rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 0.85rem;
+  box-shadow: 0 4px 12px rgba(122, 154, 130, 0.03);
+  transition: var(--transition-smooth);
+  animation: modalPanelFadeIn 0.3s ease;
+  list-style: none;
+}
+
+.appreciation-item-card.carter-card {
+  border-left: 4px solid var(--accent-rose);
+  background-color: rgba(230, 168, 156, 0.04);
+}
+
+.appreciation-item-card.jurrand-card {
+  border-left: 4px solid var(--accent-sage);
+  background-color: rgba(138, 179, 148, 0.04);
+}
+
+.appreciation-item-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(122, 154, 130, 0.06);
+}
+
+.appreciation-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.appreciation-item-date {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.appreciation-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.appreciation-item-content {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+/* Scrollbar styling for list cards */
+.appreciation-list::-webkit-scrollbar {
+  width: 6px;
+}
+.appreciation-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.appreciation-list::-webkit-scrollbar-thumb {
+  background-color: rgba(122, 154, 130, 0.15);
+  border-radius: 3px;
+}
+.appreciation-list::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(122, 154, 130, 0.3);
+}
+
+[data-theme="dark"] .appreciation-item-card.carter-card {
+  background-color: rgba(230, 168, 156, 0.02);
+  border-color: rgba(230, 168, 156, 0.7);
+}
+
+[data-theme="dark"] .appreciation-item-card.jurrand-card {
+  background-color: rgba(138, 179, 148, 0.02);
+  border-color: rgba(122, 154, 130, 0.7);
+}
+
+.btn-danger-link {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--transition-smooth);
+}
+.btn-danger-link:hover {
+  color: #a65050;
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Secure Login & User Status Styles
+   ========================================================================== */
+
+.login-card input:focus {
+  border-color: var(--accent-sage-dark) !important;
+  box-shadow: 0 0 0 3px rgba(122, 154, 130, 0.15) !important;
+  background-color: var(--bg-body) !important;
+}
+
+[data-theme="dark"] .login-card {
+  border-top-color: var(--accent-sage-dark) !important;
+  background-color: rgba(25, 30, 27, 0.75) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] #active-user-badge {
+  background: rgba(122, 154, 130, 0.15) !important;
+  color: var(--accent-sage) !important;
+  border-color: rgba(122, 154, 130, 0.25) !important;
+}
+
+#password-toggle-btn {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#password-toggle-btn:hover {
+  opacity: 0.85;
+  transform: translateY(-50%) scale(1.1);
+}
+
+#password-toggle-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.login-card label {
+  transition: color 0.2s ease;
+}
+
+.login-card input:focus + label {
+  color: var(--accent-sage-dark);
+}

@@ -13,7 +13,11 @@ const state = {
   currentStep: 1,         // 1 to 5
   draft: {},              // In-progress form inputs
   history: [],            // List of completed check-ins
-  activeView: 'welcome'   // welcome | wizard | celebration | history
+  appreciations: [],      // List of self-appreciation records
+  activeView: 'welcome',  // welcome | wizard | celebration | history | appreciation
+  partner1Name: 'Carter',
+  partner2Name: 'Jurrand',
+  user: null
 };
 
 // Default check-in records for a rich, instantly satisfying first experience
@@ -194,14 +198,47 @@ const defaultHistory = [
 
 const el = {
   // Views
+  viewLogin: document.getElementById('view-login'),
   viewWelcome: document.getElementById('view-welcome'),
   viewWizard: document.getElementById('view-wizard'),
   viewCelebration: document.getElementById('view-celebration'),
   viewHistory: document.getElementById('view-history'),
+  viewAppreciation: document.getElementById('view-appreciation'),
 
   // Header and Global controls
   themeToggleBtn: document.getElementById('theme-toggle-btn'),
   navHistoryBtn: document.getElementById('nav-history-btn'),
+  navAppreciationBtn: document.getElementById('nav-appreciation-btn'),
+  enterAppreciationBtn: document.getElementById('enter-appreciation-btn'),
+  backFromAppreciationBtn: document.getElementById('back-from-appreciation-btn'),
+  navLogoutBtn: document.getElementById('nav-logout-btn'),
+  activeUserBadge: document.getElementById('active-user-badge'),
+  activeUsernameText: document.getElementById('active-username-text'),
+
+  // Secure Login Screen selectors
+  loginForm: document.getElementById('login-form'),
+  loginUsername: document.getElementById('login-username'),
+  loginPassword: document.getElementById('login-password'),
+  passwordToggleBtn: document.getElementById('password-toggle-btn'),
+  loginSubmitBtn: document.getElementById('login-submit-btn'),
+
+  // Standalone Self-Appreciation Screen
+  appAuthorSelect: document.getElementById('appreciation-author-select'),
+  appEditorTitle: document.getElementById('appreciation-editor-title'),
+  appEditorForm: document.getElementById('appreciation-editor-form'),
+  appContent: document.getElementById('appreciation-content'),
+  appIsShared: document.getElementById('appreciation-is-shared'),
+  appTabMine: document.getElementById('app-tab-mine'),
+  appTabPartner: document.getElementById('app-tab-partner'),
+  appPanelMine: document.getElementById('app-panel-mine'),
+  appPanelPartner: document.getElementById('app-panel-partner'),
+  appEmptyMine: document.getElementById('app-empty-mine'),
+  appEmptyPartner: document.getElementById('app-empty-partner'),
+  appItemsMine: document.getElementById('app-items-mine'),
+  appItemsPartner: document.getElementById('app-items-partner'),
+  appWitnessCard: document.getElementById('appreciation-witness-card'),
+  witnessCardTitle: document.getElementById('witness-card-title'),
+  witnessCardText: document.getElementById('witness-card-text'),
 
   // Welcome Screen
   checkinMode: document.getElementById('checkin-mode'),
@@ -297,17 +334,323 @@ const stepsMeta = {
 };
 
 // ==========================================================================
+// 2.5 Security, Onboarding & Dynamic Label Swapper
+// ==========================================================================
+
+async function authFetch(url, options = {}) {
+  const token = localStorage.getItem('wecheck_token');
+  if (!options.headers) {
+    options.headers = {};
+  }
+  if (token) {
+    options.headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      handleSessionExpired();
+      throw new Error('Session expired');
+    }
+    return res;
+  } catch (err) {
+    if (err.message === 'Session expired') {
+      throw err;
+    }
+    console.error(`authFetch failed for ${url}:`, err);
+    throw err;
+  }
+}
+
+async function checkActiveSession() {
+  const token = localStorage.getItem('wecheck_token');
+  if (!token) {
+    navigateToView('login');
+    return;
+  }
+  
+  try {
+    const res = await fetch('./api/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (res.status === 401) {
+      handleSessionExpired();
+      return;
+    }
+    
+    if (res.ok) {
+      const data = await res.json();
+      state.user = data.user;
+      
+      updateUIForUser(state.user);
+      await fetchAndSwapUsernames();
+      loadHistory();
+      
+      // Navigate to welcome screen
+      navigateToView('welcome');
+    } else {
+      handleSessionExpired();
+    }
+  } catch (err) {
+    console.error("Session verification failed:", err);
+    // Offline / Network failure fallback
+    state.user = {
+      username: localStorage.getItem('wecheck_username') || 'Partner',
+      role: localStorage.getItem('wecheck_role') || 'partner_1'
+    };
+    updateUIForUser(state.user);
+    
+    // Offline names fallback
+    const u1 = localStorage.getItem('wecheck_username_p1');
+    const u2 = localStorage.getItem('wecheck_username_p2');
+    const usersList = [];
+    if (u1) usersList.push({ username: u1, role: 'partner_1' });
+    if (u2) usersList.push({ username: u2, role: 'partner_2' });
+    dynamicLabelSwapper(usersList);
+    
+    loadHistory();
+    navigateToView('welcome');
+  }
+}
+
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  
+  const username = el.loginUsername.value.trim();
+  const password = el.loginPassword.value;
+  
+  if (!username || !password) return;
+  
+  el.loginSubmitBtn.disabled = true;
+  el.loginSubmitBtn.textContent = 'Unlocking Space...';
+  
+  try {
+    const res = await fetch('./api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    
+    const data = await res.json();
+    if (res.ok && data.success) {
+      localStorage.setItem('wecheck_token', data.token);
+      localStorage.setItem('wecheck_username', data.user.username);
+      localStorage.setItem('wecheck_role', data.user.role);
+      
+      state.user = data.user;
+      showToast(data.message || "Space unlocked successfully!");
+      
+      updateUIForUser(state.user);
+      await fetchAndSwapUsernames();
+      loadHistory();
+      navigateToView('welcome');
+    } else {
+      showToast(data.error || "Authentication failed", 'error');
+    }
+  } catch (err) {
+    console.error("Login request failed:", err);
+    showToast("Connection failed. Could not authenticate.", 'error');
+  } finally {
+    el.loginSubmitBtn.disabled = false;
+    el.loginSubmitBtn.textContent = 'Unlock Space';
+  }
+}
+
+async function fetchAndSwapUsernames() {
+  try {
+    const res = await fetch('./api/users');
+    if (res.ok) {
+      const usersList = await res.json();
+      dynamicLabelSwapper(usersList);
+    }
+  } catch (err) {
+    console.error("Could not fetch user profiles for label swapping:", err);
+  }
+}
+
+function dynamicLabelSwapper(usersList) {
+  const p1Name = usersList.find(u => u.role === 'partner_1')?.username || 'Partner A';
+  const p2Name = usersList.find(u => u.role === 'partner_2')?.username || 'Partner B';
+  
+  state.partner1Name = p1Name;
+  state.partner2Name = p2Name;
+  
+  // Cache offline fallback values
+  if (usersList.find(u => u.role === 'partner_1')) {
+    localStorage.setItem('wecheck_username_p1', p1Name);
+  }
+  if (usersList.find(u => u.role === 'partner_2')) {
+    localStorage.setItem('wecheck_username_p2', p2Name);
+  }
+  
+  // Create replacements map
+  const replacements = {
+    "Carter's": `${p1Name}'s`,
+    "Carter": p1Name,
+    "Jurrand's": `${p2Name}'s`,
+    "Jurrand": p2Name
+  };
+
+  // 1. Traverse all text nodes in body
+  replaceTextInDOM(document.body, replacements);
+
+  // 2. Swapping names in select options directly
+  const modeSelect = document.getElementById('checkin-mode');
+  if (modeSelect) {
+    Array.from(modeSelect.options).forEach(opt => {
+      if (opt.value === 'carter') {
+        opt.text = `${p1Name}'s Turn (${p1Name} fills out, ${p2Name}'s fields hidden)`;
+      } else if (opt.value === 'jurrand') {
+        opt.text = `${p2Name}'s Turn (${p2Name} fills out, ${p1Name}'s fields hidden)`;
+      }
+    });
+  }
+
+  const appAuthorSelect = document.getElementById('appreciation-author-select');
+  if (appAuthorSelect) {
+    Array.from(appAuthorSelect.options).forEach(opt => {
+      if (opt.value === 'carter') {
+        opt.text = `${p1Name}'s Journal`;
+      } else if (opt.value === 'jurrand') {
+        opt.text = `${p2Name}'s Journal`;
+      }
+    });
+  }
+
+  // 3. Swap in specific input placeholders and attributes
+  const appContent = document.getElementById('appreciation-content');
+  if (appContent) {
+    appContent.placeholder = appContent.placeholder
+      .replaceAll('Carter', p1Name)
+      .replaceAll('Jurrand', p2Name);
+  }
+
+  // Update scale aria-labels
+  const cScale = document.getElementById('c-scale');
+  if (cScale) cScale.setAttribute('aria-label', `${p1Name}'s connection scale value`);
+  const jScale = document.getElementById('j-scale');
+  if (jScale) jScale.setAttribute('aria-label', `${p2Name}'s connection scale value`);
+
+  // Update textareas placeholders or labels
+  document.querySelectorAll('textarea').forEach(ta => {
+    if (ta.placeholder) {
+      ta.placeholder = ta.placeholder
+        .replaceAll('Carter', p1Name)
+        .replaceAll('Jurrand', p2Name);
+    }
+  });
+}
+
+function replaceTextInDOM(node, map) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    let text = node.nodeValue;
+    let modified = false;
+    for (const [search, replace] of Object.entries(map)) {
+      if (text.includes(search)) {
+        text = text.replaceAll(search, replace);
+        modified = true;
+      }
+    }
+    if (modified) {
+      node.nodeValue = text;
+    }
+  } else {
+    const tagName = node.tagName ? node.tagName.toLowerCase() : '';
+    if (tagName !== 'script' && tagName !== 'style' && tagName !== 'textarea' && tagName !== 'input') {
+      for (let i = 0; i < node.childNodes.length; i++) {
+        replaceTextInDOM(node.childNodes[i], map);
+      }
+    }
+  }
+}
+
+async function handleLogout() {
+  const token = localStorage.getItem('wecheck_token');
+  showToast("Locking space...", 'info');
+  
+  if (token) {
+    try {
+      await fetch('./api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (err) {
+      console.warn("Server logout failed (offline or disconnected):", err);
+    }
+  }
+  
+  localStorage.removeItem('wecheck_token');
+  localStorage.removeItem('wecheck_username');
+  localStorage.removeItem('wecheck_role');
+  
+  state.user = null;
+  state.history = [];
+  state.appreciations = [];
+  
+  el.historyContainer.innerHTML = '';
+  
+  navigateToView('login');
+  showToast("Application locked.");
+}
+
+function handleSessionExpired() {
+  localStorage.removeItem('wecheck_token');
+  localStorage.removeItem('wecheck_username');
+  localStorage.removeItem('wecheck_role');
+  
+  state.user = null;
+  state.history = [];
+  state.appreciations = [];
+  
+  navigateToView('login');
+  showToast("Session expired. Please unlock the app again.", 'error');
+}
+
+function togglePasswordVisibility() {
+  const type = el.loginPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+  el.loginPassword.setAttribute('type', type);
+  el.passwordToggleBtn.textContent = type === 'password' ? '👁️' : '🙈';
+}
+
+function updateUIForUser(user) {
+  if (user) {
+    el.activeUsernameText.textContent = user.username;
+    el.activeUserBadge.style.display = 'inline-flex';
+    el.navLogoutBtn.style.display = 'inline-block';
+    el.navAppreciationBtn.style.display = 'inline-block';
+    el.navHistoryBtn.style.display = 'inline-block';
+  } else {
+    el.activeUserBadge.style.display = 'none';
+    el.navLogoutBtn.style.display = 'none';
+    el.navAppreciationBtn.style.display = 'none';
+    el.navHistoryBtn.style.display = 'none';
+  }
+}
+
+// ==========================================================================
 // 3. Setup Navigation & Routing Views
 // ==========================================================================
 
 function navigateToView(viewName) {
+  // Enforce secure redirection: if not logged in, force to login view
+  const token = localStorage.getItem('wecheck_token');
+  if (!token && viewName !== 'login') {
+    viewName = 'login';
+  }
+
   // Hide all views, activate target
-  ['welcome', 'wizard', 'celebration', 'history'].forEach(v => {
+  ['login', 'welcome', 'wizard', 'celebration', 'history', 'appreciation'].forEach(v => {
     const elView = el['view' + v.charAt(0).toUpperCase() + v.slice(1)];
-    if (v === viewName) {
-      elView.classList.add('active-view');
-    } else {
-      elView.classList.remove('active-view');
+    if (elView) {
+      if (v === viewName) {
+        elView.classList.add('active-view');
+      } else {
+        elView.classList.remove('active-view');
+      }
     }
   });
 
@@ -320,6 +663,18 @@ function navigateToView(viewName) {
     renderMiniDashboard();
   } else if (viewName === 'history') {
     renderHistoryDashboard();
+  } else if (viewName === 'appreciation') {
+    loadAppreciationSpace();
+  } else if (viewName === 'login') {
+    // Reset login inputs
+    el.loginUsername.value = '';
+    el.loginPassword.value = '';
+    
+    // Hide header controls upon lock
+    el.navLogoutBtn.style.display = 'none';
+    el.activeUserBadge.style.display = 'none';
+    el.navAppreciationBtn.style.display = 'none';
+    el.navHistoryBtn.style.display = 'none';
   }
 }
 
@@ -770,78 +1125,80 @@ function generateMarkdownSummary(answers, timestamp, checkinMode) {
   };
 
   const mode = checkinMode || state.mode;
+  const p1Name = state.partner1Name || 'Carter';
+  const p2Name = state.partner2Name || 'Jurrand';
 
   let out = `## Relationship Check-In: ${dateStr}\n\n`;
 
   // Section 1: Connectedness
   out += `1. Connectedness\n`;
   out += `On a scale of 1-10 how connected to me have you felt this week?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_scale')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_scale')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_scale')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_scale')}\n`;
   
   out += `\nWhat made you feel most connected to me?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_most_connected')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_most_connected')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_most_connected')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_most_connected')}\n`;
   
   out += `\nWhat made you feel distant from me?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_distant')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_distant')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_distant')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_distant')}\n`;
 
   // Section 2: Needs
   out += `\n2. Needs\n`;
   out += `What's one thing you need more of from me this week?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_more_of')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_more_of')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_more_of')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_more_of')}\n`;
   
   out += `\nWhat’s one thing you need less of?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_less_of')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_less_of')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_less_of')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_less_of')}\n`;
   
   out += `\nIs there anything from this week that's bothering you that you haven't mentioned?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_bothering')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_bothering')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_bothering')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_bothering')}\n`;
 
   // Section 3: Appreciation
   out += `\n3. Appreciation\n`;
   out += `What's something I did this week/month that made you feel loved?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_feel_loved')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_feel_loved')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_feel_loved')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_feel_loved')}\n`;
   
   out += `\nWhat's a quality of mine you're grateful for right now?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_grateful_quality')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_grateful_quality')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_grateful_quality')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_grateful_quality')}\n`;
   
   out += `\nWhat's something you appreciate about our relationship lately?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_appreciate_relationship')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_appreciate_relationship')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_appreciate_relationship')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_appreciate_relationship')}\n`;
 
   // Section 4: Goals/Future
   out += `\n4. Goals/Future\n`;
   out += `Are we still on the same page about goals?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getYesNo('c_goals_page')} - Note: ${getVal('c_goals_notes')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getYesNo('j_goals_page')} - Note: ${getVal('j_goals_notes')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getYesNo('c_goals_page')} - Note: ${getVal('c_goals_notes')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getYesNo('j_goals_page')} - Note: ${getVal('j_goals_notes')}\n`;
   
   out += `\nIs there anything about our future that is worrying you?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_future_worries')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_future_worries')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_future_worries')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_future_worries')}\n`;
   
   out += `\nWhat's something you're excited about regarding us?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_excited')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_excited')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_excited')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_excited')}\n`;
 
   // Section 5: Overview
   out += `\n5. Overview\n`;
   out += `How are we doing as a couple?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_couple_status')} - Note: ${getVal('c_couple_overview_notes')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_couple_status')} - Note: ${getVal('j_couple_overview_notes')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_couple_status')} - Note: ${getVal('c_couple_overview_notes')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_couple_status')} - Note: ${getVal('j_couple_overview_notes')}\n`;
   
   out += `\nWhat's one thing we could improve?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_improve')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_improve')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_improve')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_improve')}\n`;
   
   out += `\nWhat's working really well for us right now?\n`;
-  if (mode !== 'jurrand') out += `Carter: ${getVal('c_working_well')}\n`;
-  if (mode !== 'carter') out += `Jurrand: ${getVal('j_working_well')}\n`;
+  if (mode !== 'jurrand') out += `${p1Name}: ${getVal('c_working_well')}\n`;
+  if (mode !== 'carter') out += `${p2Name}: ${getVal('j_working_well')}\n`;
 
   return out;
 }
@@ -896,7 +1253,7 @@ async function saveCheckInToHistory() {
 
   // Try saving to the DB server first (absolute single source of truth)
   try {
-    const res = await fetch('./api/check-in', {
+    const res = await authFetch('./api/check-in', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(record)
@@ -937,7 +1294,7 @@ function discardDraftAndExit() {
 // --- Unified Database API Helpers ---
 async function fetchHistoryFromServer() {
   try {
-    const res = await fetch('./api/history');
+    const res = await authFetch('./api/history');
     if (!res.ok) throw new Error("HTTP error " + res.status);
     const serverHistory = await res.json();
     if (Array.isArray(serverHistory)) {
@@ -964,7 +1321,7 @@ async function fetchHistoryFromServer() {
 
 async function saveCheckInToServer(record) {
   try {
-    const res = await fetch('./api/check-in', {
+    const res = await authFetch('./api/check-in', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(record)
@@ -979,7 +1336,7 @@ async function saveCheckInToServer(record) {
 async function syncAllWithServer() {
   if (state.history.length === 0) return;
   try {
-    const res = await fetch('./api/sync', {
+    const res = await authFetch('./api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ checkIns: state.history })
@@ -1041,12 +1398,15 @@ function renderHistoryDashboard() {
     const cScore = item.answers.c_scale ? parseInt(item.answers.c_scale) : null;
     const jScore = item.answers.j_scale ? parseInt(item.answers.j_scale) : null;
 
+    const p1Name = state.partner1Name || 'Carter';
+    const p2Name = state.partner2Name || 'Jurrand';
+
     let scoresBadgesHtml = '';
     if (item.mode !== 'jurrand' && cScore !== null) {
-      scoresBadgesHtml += `<span class="score-badge c-badge">Carter: ${cScore}</span>`;
+      scoresBadgesHtml += `<span class="score-badge c-badge">${p1Name}: ${cScore}</span>`;
     }
     if (item.mode !== 'carter' && jScore !== null) {
-      scoresBadgesHtml += `<span class="score-badge j-badge">Jurrand: ${jScore}</span>`;
+      scoresBadgesHtml += `<span class="score-badge j-badge">${p2Name}: ${jScore}</span>`;
     }
 
     li.innerHTML = `
@@ -1106,6 +1466,8 @@ function renderMiniDashboard() {
  */
 function drawTrendChart(range) {
   const svg = el.trendSvg;
+  const p1Name = state.partner1Name || 'Carter';
+  const p2Name = state.partner2Name || 'Jurrand';
   svg.innerHTML = ''; // reset
 
   // Filter history records based on user selector
@@ -1280,7 +1642,7 @@ function drawTrendChart(range) {
     
     // Dynamic SVG tooltip details on click/hover
     dot.addEventListener('click', () => {
-      showToast(`Carter: ${p.val} on ${p.date}`);
+      showToast(`${p1Name}: ${p.val} on ${p.date}`);
     });
     svg.appendChild(dot);
   });
@@ -1293,7 +1655,7 @@ function drawTrendChart(range) {
     dot.setAttribute('class', 'chart-dot-jurrand');
     
     dot.addEventListener('click', () => {
-      showToast(`Jurrand: ${p.val} on ${p.date}`);
+      showToast(`${p2Name}: ${p.val} on ${p.date}`);
     });
     svg.appendChild(dot);
   });
@@ -1357,6 +1719,9 @@ function drawSparklineChart() {
 function openCheckInDetailsModal(item) {
   el.modalTitle.textContent = `Check-In Details: ${item.date}`;
   
+  const p1Name = state.partner1Name || 'Carter';
+  const p2Name = state.partner2Name || 'Jurrand';
+
   // Format answers for modal
   const answers = item.answers;
   const mode = item.mode;
@@ -1396,7 +1761,7 @@ function openCheckInDetailsModal(item) {
     if (mode !== 'jurrand') {
       innerCols += `
         <div class="modal-ans-card c-ans">
-          <div class="name-tag">Carter</div>
+          <div class="name-tag">${p1Name}</div>
           <div class="content-text">${leftHtml}</div>
         </div>
       `;
@@ -1404,7 +1769,7 @@ function openCheckInDetailsModal(item) {
     if (mode !== 'carter') {
       innerCols += `
         <div class="modal-ans-card j-ans">
-          <div class="name-tag">Jurrand</div>
+          <div class="name-tag">${p2Name}</div>
           <div class="content-text">${rightHtml}</div>
         </div>
       `;
@@ -1602,7 +1967,7 @@ async function clearDatabase() {
     try {
       // Run deletions in parallel and wait for all to complete
       await Promise.all(state.history.map(item => 
-        fetch(`./api/check-in/${item.timestamp}`, { method: 'DELETE' })
+        authFetch(`./api/check-in/${item.timestamp}`, { method: 'DELETE' })
           .catch(err => console.warn(`Could not delete check-in ${item.timestamp} on server:`, err))
       ));
       
@@ -1619,6 +1984,231 @@ async function clearDatabase() {
       renderHistoryDashboard();
     }
   }
+}
+
+// ==========================================================================
+// Standalone Self-Appreciation Space Feature Logic
+// ==========================================================================
+
+async function loadAppreciationSpace() {
+  showToast("Loading your Self-Appreciation Journal...", 'info');
+  try {
+    const res = await authFetch('./api/self-appreciations');
+    if (res.ok) {
+      state.appreciations = await res.json();
+    } else {
+      console.warn("Failed to load self-appreciations from remote database");
+    }
+  } catch (err) {
+    console.error("Error loading self-appreciations:", err);
+    showToast("Loaded offline/cached data", 'warning');
+  }
+
+  // Default dropdown to the logged-in user!
+  if (state.user) {
+    const defaultAuthor = state.user.role === 'partner_2' ? 'jurrand' : 'carter';
+    el.appAuthorSelect.value = defaultAuthor;
+  }
+
+  // Reset tab to 'mine' on open
+  switchAppreciationTab('mine');
+  handleAppreciationAuthorChange();
+}
+
+function switchAppreciationTab(tabName) {
+  if (tabName === 'mine') {
+    el.appTabMine.classList.add('active');
+    el.appTabMine.style.borderBottomColor = 'var(--accent-sage)';
+    el.appTabPartner.classList.remove('active');
+    el.appTabPartner.style.borderBottomColor = 'transparent';
+    el.appPanelMine.style.display = 'block';
+    el.appPanelMine.classList.add('active');
+    el.appPanelPartner.style.display = 'none';
+    el.appPanelPartner.classList.remove('active');
+  } else {
+    el.appTabMine.classList.remove('active');
+    el.appTabMine.style.borderBottomColor = 'transparent';
+    el.appTabPartner.classList.add('active');
+    el.appTabPartner.style.borderBottomColor = 'var(--accent-sage)';
+    el.appPanelMine.style.display = 'none';
+    el.appPanelMine.classList.remove('active');
+    el.appPanelPartner.style.display = 'block';
+    el.appPanelPartner.classList.add('active');
+  }
+}
+
+function handleAppreciationAuthorChange() {
+  const author = el.appAuthorSelect.value;
+  const p1Name = state.partner1Name || 'Carter';
+  const p2Name = state.partner2Name || 'Jurrand';
+  const name = author === 'carter' ? p1Name : p2Name;
+  const partnerName = author === 'carter' ? p2Name : p1Name;
+
+  el.appEditorTitle.textContent = `Write in ${name}'s Journal`;
+  el.appContent.placeholder = `Today I (${name}) like that I... (e.g. kept my boundary about work hours, stayed patient with my thoughts, took a relaxing solo walk...)`;
+  
+  el.appTabMine.textContent = `${name}'s Reflections`;
+  el.appTabPartner.textContent = `Witnessing ${partnerName}'s Growth`;
+
+  // Custom theme variables for form buttons
+  const isCarter = author === 'carter';
+  // Apply colors to save button
+  el.appEditorForm.querySelector('button[type="submit"]').style.backgroundColor = isCarter ? 'var(--accent-rose)' : 'var(--accent-sage-dark)';
+
+  // Frontend row-level protection:
+  // If the logged-in user selects their partner's journal, hide the editor and show the witness panel card!
+  const myAuthorVal = state.user && state.user.role === 'partner_2' ? 'jurrand' : 'carter';
+  const formCard = document.querySelector('.appreciation-form-card');
+  const witnessCard = el.appWitnessCard;
+
+  if (author !== myAuthorVal) {
+    // Hide the input form card
+    if (formCard) formCard.style.display = 'none';
+    // Show the witness card
+    if (witnessCard) {
+      witnessCard.style.display = 'flex';
+      
+      if (el.witnessCardTitle) {
+        el.witnessCardTitle.textContent = `Viewing ${name}'s Journal`;
+      }
+      if (el.witnessCardText) {
+        el.witnessCardText.innerHTML = `Viewing <strong>${name}</strong>'s shared growth journal.<br>You are here to witness and support their self-love journey.`;
+      }
+    }
+  } else {
+    // Show the input form card
+    if (formCard) formCard.style.display = 'flex';
+    // Hide the witness card
+    if (witnessCard) witnessCard.style.display = 'none';
+  }
+
+  renderAppreciationLists();
+}
+
+async function handleAppreciationFormSubmit(e) {
+  e.preventDefault();
+  const author = el.appAuthorSelect.value;
+  const content = el.appContent.value.trim();
+  const is_shared = el.appIsShared.checked;
+
+  if (!content) return;
+
+  const date = new Date().toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric'
+  });
+  const timestamp = Date.now();
+
+  const submitBtn = el.appEditorForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving Reflection...';
+
+  try {
+    const res = await authFetch('./api/self-appreciations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ author, date, timestamp, content, is_shared })
+    });
+
+    if (res.ok) {
+      showToast("Reflection saved successfully!");
+      el.appContent.value = ''; // Reset editor
+      await loadAppreciationSpace();
+    } else {
+      showToast("Failed to save reflection to database", 'error');
+    }
+  } catch (err) {
+    console.error("Error saving self-appreciation:", err);
+    showToast("Connection failed, could not save reflection", 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Save Reflection';
+  }
+}
+
+async function deleteAppreciation(id) {
+  if (confirm("Are you sure you want to delete this self-appreciation reflection?")) {
+    showToast("Deleting reflection...", 'info');
+    try {
+      const res = await authFetch(`./api/self-appreciations/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast("Reflection deleted successfully!");
+        await loadAppreciationSpace();
+      } else {
+        showToast("Failed to delete reflection", 'error');
+      }
+    } catch (err) {
+      console.error("Error deleting self-appreciation:", err);
+      showToast("Failed to delete reflection (Offline)", 'error');
+    }
+  }
+}
+
+function renderAppreciationLists() {
+  const author = el.appAuthorSelect.value;
+  const partnerName = author === 'carter' ? 'jurrand' : 'carter';
+
+  const mine = (state.appreciations || []).filter(item => item.author === author);
+  const partner = (state.appreciations || []).filter(item => item.author === partnerName && item.is_shared);
+
+  // 1. Render Mine List
+  if (mine.length === 0) {
+    el.appEmptyMine.style.display = 'block';
+    el.appItemsMine.style.display = 'none';
+  } else {
+    el.appEmptyMine.style.display = 'none';
+    el.appItemsMine.style.display = 'flex';
+    
+    el.appItemsMine.innerHTML = mine.map(item => `
+      <li class="appreciation-item-card ${item.author}-card">
+        <div class="appreciation-item-header">
+          <span class="appreciation-item-date">${item.date}</span>
+          <div class="appreciation-item-meta">
+            ${item.is_shared ? 
+              `<span title="Shared with partner" style="color: var(--accent-sage-dark); font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> Shared</span>` : 
+              `<span title="Private to me" style="color: var(--text-muted); font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Private</span>`
+            }
+            <button class="delete-appreciation-btn btn-danger-link" data-id="${item.id}">Delete</button>
+          </div>
+        </div>
+        <p class="appreciation-item-content">"${escapeHtml(item.content)}"</p>
+      </li>
+    `).join('');
+  }
+
+  // 2. Render Partner List
+  if (partner.length === 0) {
+    el.appEmptyPartner.style.display = 'block';
+    el.appItemsPartner.style.display = 'none';
+  } else {
+    el.appEmptyPartner.style.display = 'none';
+    el.appItemsPartner.style.display = 'flex';
+    
+    el.appItemsPartner.innerHTML = partner.map(item => `
+      <li class="appreciation-item-card ${item.author}-card">
+        <div class="appreciation-item-header">
+          <span class="appreciation-item-date">${item.date}</span>
+          <span style="color: var(--accent-sage-dark); font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> Shared Growth
+          </span>
+        </div>
+        <p class="appreciation-item-content">"${escapeHtml(item.content)}"</p>
+      </li>
+    `).join('');
+  }
+
+  // Attach delete button listeners
+  el.appPanelMine.querySelectorAll('.delete-appreciation-btn').forEach(btn => {
+    btn.onclick = () => deleteAppreciation(Number(btn.dataset.id));
+  });
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // ==========================================================================
@@ -1654,14 +2244,28 @@ function showToast(message, type = 'info') {
 // ==========================================================================
 
 function registerEvents() {
+  // Secure Login events
+  el.loginForm.addEventListener('submit', handleLoginSubmit);
+  el.passwordToggleBtn.addEventListener('click', togglePasswordVisibility);
+  el.navLogoutBtn.addEventListener('click', handleLogout);
+
   // Navigation Links
   el.navHistoryBtn.addEventListener('click', () => navigateToView('history'));
   el.backFromHistoryBtn.addEventListener('click', () => navigateToView('welcome'));
+  el.navAppreciationBtn.addEventListener('click', () => navigateToView('appreciation'));
+  el.enterAppreciationBtn.addEventListener('click', () => navigateToView('appreciation'));
+  el.backFromAppreciationBtn.addEventListener('click', () => navigateToView('welcome'));
 
   // Welcome page buttons
   el.startCheckinBtn.addEventListener('click', startNewCheckIn);
   el.resumeDraftBtn.addEventListener('click', resumeDraft);
   el.checkinMode.addEventListener('change', configureFormColumns);
+
+  // Standalone Self-Appreciation events
+  el.appTabMine.addEventListener('click', () => switchAppreciationTab('mine'));
+  el.appTabPartner.addEventListener('click', () => switchAppreciationTab('partner'));
+  el.appAuthorSelect.addEventListener('change', handleAppreciationAuthorChange);
+  el.appEditorForm.addEventListener('submit', handleAppreciationFormSubmit);
 
   // Form Controls back/next/cancel
   el.wizardNextBtn.addEventListener('click', handleWizardNext);
@@ -1716,7 +2320,6 @@ function registerEvents() {
 // App initial setup
 function init() {
   initTheme();
-  loadHistory();
   initFormControls();
   registerEvents();
   configureFormColumns();
@@ -1730,9 +2333,6 @@ function init() {
     });
   }
   
-  // Route to initial welcome view
-  navigateToView('welcome');
-  
   // Dynamic resize handler for redrawing SVGs properly
   window.addEventListener('resize', () => {
     if (state.activeView === 'history') {
@@ -1742,6 +2342,9 @@ function init() {
       renderMiniDashboard();
     }
   });
+
+  // Verify and boot session on startup
+  checkActiveSession();
 }
 
 // Let it begin!

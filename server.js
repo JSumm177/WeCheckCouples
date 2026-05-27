@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 8085;
@@ -102,11 +103,183 @@ function mapRowToAppModel(row) {
 }
 
 // --------------------------------------------------------------------------
+// Cryptographic Helpers & Authentication Middleware
+// --------------------------------------------------------------------------
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return { hash, salt };
+}
+
+function verifyPassword(password, salt, storedHash) {
+  const verifyHash = crypto.scryptSync(password, salt, 64).toString('hex');
+  try {
+    return crypto.timingSafeEqual(Buffer.from(storedHash, 'hex'), Buffer.from(verifyHash, 'hex'));
+  } catch (e) {
+    return false;
+  }
+}
+
+async function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied. No session token provided.' });
+  }
+  
+  try {
+    const [sessions] = await pool.query(
+      `SELECT s.user_id, u.username, u.role 
+       FROM sessions s 
+       JOIN users u ON s.user_id = u.id 
+       WHERE s.token = ? AND s.expires_at > NOW()`,
+      [token]
+    );
+    
+    if (sessions.length === 0) {
+      return res.status(401).json({ error: 'Session expired or invalid.' });
+    }
+    
+    req.user = {
+      id: sessions[0].user_id,
+      username: sessions[0].username,
+      role: sessions[0].role
+    };
+    next();
+  } catch (err) {
+    console.error('Authentication middleware error:', err);
+    res.status(500).json({ error: 'Authentication check failed' });
+  }
+}
+
+// --------------------------------------------------------------------------
 // API Routes
 // --------------------------------------------------------------------------
 
+// ==========================================================================
+// Authentication Endpoints
+// ==========================================================================
+
+// A. Login & Auto-Registration
+app.post('/api/auth/login', async (req, res) => {
+  let { username, password } = req.body;
+  username = username?.trim().toLowerCase();
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  try {
+    // Check if user exists
+    const [users] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+    
+    if (users.length > 0) {
+      // User exists, verify password
+      const user = users[0];
+      const isValid = verifyPassword(password, user.salt, user.password_hash);
+      
+      if (!isValid) {
+        return res.status(401).json({ error: 'Invalid password. Please try again.' });
+      }
+      
+      // Password is valid, generate session token
+      const token = crypto.randomBytes(32).toString('hex');
+      await pool.query(
+        'INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))',
+        [user.id, token]
+      );
+      
+      return res.json({
+        success: true,
+        token,
+        user: {
+          username: user.username,
+          role: user.role
+        }
+      });
+    } else {
+      // User does not exist, let's see if we can register them (max 2 users)
+      const [countResult] = await pool.query('SELECT COUNT(*) as cnt FROM users');
+      const count = countResult[0].cnt;
+      
+      if (count >= 2) {
+        return res.status(400).json({ error: 'Private space limit reached. Only two accounts are allowed to register.' });
+      }
+      
+      // Auto-register!
+      const role = count === 0 ? 'partner_1' : 'partner_2';
+      const { hash, salt } = hashPassword(password);
+      
+      const [insertResult] = await pool.query(
+        'INSERT INTO users (username, password_hash, salt, role) VALUES (?, ?, ?, ?)',
+        [username, hash, salt, role]
+      );
+      
+      const userId = insertResult.insertId;
+      const token = crypto.randomBytes(32).toString('hex');
+      await pool.query(
+        'INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))',
+        [userId, token]
+      );
+      
+      console.log(`Registered new dynamic user: ${username} with role: ${role}`);
+      
+      return res.json({
+        success: true,
+        message: 'Account registered and secured successfully!',
+        token,
+        user: {
+          username,
+          role
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Error during auth login:', err);
+    res.status(500).json({ error: 'Authentication process failed' });
+  }
+});
+
+// B. Logout
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  try {
+    await pool.query('DELETE FROM sessions WHERE token = ?', [token]);
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Error during logout:', err);
+    res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// C. Verify active session / get active user
+app.get('/api/auth/me', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    user: {
+      username: req.user.username,
+      role: req.user.role
+    }
+  });
+});
+
+// D. Get all registered users (so client can dynamically update labels)
+app.get('/api/users', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT username, role FROM users ORDER BY id ASC');
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching users list:', err);
+    res.status(500).json({ error: 'Failed to fetch registered profiles' });
+  }
+});
+
 // 1. Get entire check-in history
-app.get('/api/history', async (req, res) => {
+app.get('/api/history', authenticateToken, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM check_ins ORDER BY check_in_timestamp DESC');
     const history = rows.map(mapRowToAppModel);
@@ -118,7 +291,7 @@ app.get('/api/history', async (req, res) => {
 });
 
 // 2. Add or Update a check-in
-app.post('/api/check-in', async (req, res) => {
+app.post('/api/check-in', authenticateToken, async (req, res) => {
   const { date, timestamp, mode, answers } = req.body;
   
   if (!date || !timestamp || !mode) {
@@ -204,7 +377,7 @@ app.post('/api/check-in', async (req, res) => {
 });
 
 // 3. Delete a check-in
-app.delete('/api/check-in/:timestamp', async (req, res) => {
+app.delete('/api/check-in/:timestamp', authenticateToken, async (req, res) => {
   const timestamp = Number(req.params.timestamp);
   if (isNaN(timestamp)) {
     return res.status(400).json({ error: 'Invalid timestamp parameter' });
@@ -224,8 +397,120 @@ app.delete('/api/check-in/:timestamp', async (req, res) => {
   }
 });
 
+// ==========================================================================
+// Standalone Self-Appreciation Routes
+// ==========================================================================
+
+// A. Get all self-appreciations
+app.get('/api/self-appreciations', authenticateToken, async (req, res) => {
+  try {
+    const myAuthorVal = req.user.role === 'partner_2' ? 'jurrand' : 'carter';
+    // Row-level filter: Return only logged-in user reflections OR partner shared reflections
+    const [rows] = await pool.query(
+      `SELECT * FROM self_appreciations 
+       WHERE author = ? OR (author != ? AND is_shared = 1) 
+       ORDER BY reflection_timestamp DESC`,
+      [myAuthorVal, myAuthorVal]
+    );
+    
+    const reflections = rows.map(row => ({
+      id: row.id,
+      author: row.author,
+      date: row.reflection_date,
+      timestamp: Number(row.reflection_timestamp),
+      content: row.content,
+      is_shared: row.is_shared === 1
+    }));
+    res.json(reflections);
+  } catch (err) {
+    console.error('Error fetching self-appreciations:', err);
+    res.status(500).json({ error: 'Database query failed' });
+  }
+});
+
+// B. Add or Update a self-appreciation
+app.post('/api/self-appreciations', authenticateToken, async (req, res) => {
+  const { id, author, date, timestamp, content, is_shared } = req.body;
+  
+  if (!author || !date || !timestamp || !content) {
+    return res.status(400).json({ error: 'Missing required self-appreciation parameters' });
+  }
+  
+  const myAuthorVal = req.user.role === 'partner_2' ? 'jurrand' : 'carter';
+  // Row-level validation: verify that the logged-in user is the author!
+  if (author !== myAuthorVal) {
+    return res.status(403).json({ error: 'Access denied. You cannot write reflections on behalf of your partner.' });
+  }
+  
+  const fields = {
+    author,
+    reflection_date: date,
+    reflection_timestamp: Number(timestamp),
+    content,
+    is_shared: is_shared === true ? 1 : 0
+  };
+  
+  try {
+    if (id) {
+      // Perform Update
+      // Enforce ownership: query first to verify that the logged-in user is the author
+      const [existing] = await pool.query('SELECT author FROM self_appreciations WHERE id = ?', [id]);
+      if (existing.length === 0 || existing[0].author !== myAuthorVal) {
+        return res.status(403).json({ error: 'Access denied. You can only modify your own reflections.' });
+      }
+      
+      const updateKeys = Object.keys(fields).map(key => `${key} = ?`).join(', ');
+      const updateValues = [...Object.values(fields), id];
+      
+      await pool.query(`UPDATE self_appreciations SET ${updateKeys} WHERE id = ?`, updateValues);
+      console.log(`Updated self-appreciation ID: ${id}`);
+      res.json({ success: true, message: 'Reflection updated successfully', id });
+    } else {
+      // Perform Insert
+      const keys = Object.keys(fields).join(', ');
+      const placeholders = Object.keys(fields).map(() => '?').join(', ');
+      const values = Object.values(fields);
+      
+      const [result] = await pool.query(`INSERT INTO self_appreciations (${keys}) VALUES (${placeholders})`, values);
+      console.log(`Created self-appreciation ID: ${result.insertId}`);
+      res.json({ success: true, message: 'Reflection saved successfully', id: result.insertId });
+    }
+  } catch (err) {
+    console.error('Error saving self-appreciation:', err);
+    res.status(500).json({ error: 'Database save operation failed' });
+  }
+});
+
+// C. Delete a self-appreciation
+app.delete('/api/self-appreciations/:id', authenticateToken, async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid ID parameter' });
+  }
+  
+  try {
+    // Enforce ownership: check author first
+    const [existing] = await pool.query('SELECT author FROM self_appreciations WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Reflection not found' });
+    }
+    
+    const myAuthorVal = req.user.role === 'partner_2' ? 'jurrand' : 'carter';
+    if (existing[0].author !== myAuthorVal) {
+      return res.status(403).json({ error: 'Access denied. You can only delete your own reflections.' });
+    }
+    
+    await pool.query('DELETE FROM self_appreciations WHERE id = ?', [id]);
+    console.log(`Deleted self-appreciation with ID: ${id}`);
+    res.json({ success: true, message: 'Reflection deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting self-appreciation:', err);
+    res.status(500).json({ error: 'Database delete operation failed' });
+  }
+});
+
 // 4. Batch sync offline records
-app.post('/api/sync', async (req, res) => {
+app.post('/api/sync', authenticateToken, async (req, res) => {
   const { checkIns } = req.body;
   if (!Array.isArray(checkIns)) {
     return res.status(400).json({ error: 'Invalid sync payload. Expected array of checkIns.' });

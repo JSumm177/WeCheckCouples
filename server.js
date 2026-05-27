@@ -11,13 +11,19 @@ const PORT = process.env.PORT || 8085;
 app.use(cors());
 app.use(express.json());
 
+// Ensure required environment variables are set
+if (!process.env.DB_USER || !process.env.DB_PASSWORD) {
+  console.error('FATAL ERROR: DB_USER and DB_PASSWORD environment variables are required.');
+  process.exit(1);
+}
+
 // Database connection configuration
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: Number(process.env.DB_PORT || 3306),
   database: process.env.DB_NAME || 'wecheck_db',
-  user: process.env.DB_USER || 'wecheck_user',
-  password: process.env.DB_PASSWORD || 'wecheck_password',
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
   connectionLimit: 10
 };
 
